@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: my-todo-list
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: TODO_FILE_PATH
+        value: /var/data/todos.json
+    disk:
+      name: todo-data
+      mountPath: /var/data
+      sizeGB: 1
