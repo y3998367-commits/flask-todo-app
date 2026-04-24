@@ -1,520 +1,405 @@
 import json
 import os
+import secrets
+import tempfile
+import threading
+from datetime import datetime, timezone
+from pathlib import Path
 
-from flask import Flask, redirect, render_template_string, request, url_for
+from flask import Flask, jsonify, render_template, request
 
 
 app = Flask(__name__)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_FILE_PATH = os.path.join(BASE_DIR, "todos.json")
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_FILE = Path(os.environ.get("TODO_DATA_FILE", str(BASE_DIR / "todos.json"))).resolve()
+DATA_LOCK = threading.Lock()
 
 
-HTML_PAGE = """
-<!doctype html>
-<html lang="zh-CN">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>我的待办清单</title>
-    <style>
-        :root {
-            --bg-top: #f9f1e8;
-            --bg-bottom: #eef6f1;
-            --card: rgba(255, 255, 255, 0.92);
-            --text: #213547;
-            --muted: #6b7a89;
-            --line: rgba(33, 53, 71, 0.08);
-            --accent: #ff7a59;
-            --accent-dark: #e56747;
-            --done: #3a9d7a;
-            --danger: #e14d5a;
-            --shadow: 0 20px 50px rgba(33, 53, 71, 0.12);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-            color: var(--text);
-            background:
-                radial-gradient(circle at top left, rgba(255, 122, 89, 0.18), transparent 30%),
-                radial-gradient(circle at top right, rgba(58, 157, 122, 0.16), transparent 24%),
-                linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
-            padding: 32px 16px;
-        }
-
-        .shell {
-            max-width: 860px;
-            margin: 0 auto;
-        }
-
-        .hero {
-            background: var(--card);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.7);
-            border-radius: 28px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-
-        .hero-top {
-            padding: 32px 32px 24px;
-            background:
-                linear-gradient(135deg, rgba(255, 122, 89, 0.18), rgba(58, 157, 122, 0.12)),
-                linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.82));
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.75);
-            color: var(--accent-dark);
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        h1 {
-            margin: 18px 0 10px;
-            font-size: 38px;
-            line-height: 1.1;
-        }
-
-        .subtitle {
-            margin: 0;
-            color: var(--muted);
-            font-size: 16px;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 14px;
-            margin-top: 24px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.72);
-            border: 1px solid rgba(255, 255, 255, 0.7);
-            border-radius: 20px;
-            padding: 18px;
-        }
-
-        .stat-label {
-            margin: 0 0 8px;
-            color: var(--muted);
-            font-size: 14px;
-        }
-
-        .stat-value {
-            margin: 0;
-            font-size: 30px;
-            font-weight: 700;
-        }
-
-        .content {
-            padding: 28px 32px 32px;
-        }
-
-        .toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-        }
-
-        .add-form {
-            display: flex;
-            flex: 1;
-            min-width: 280px;
-            gap: 12px;
-        }
-
-        .add-form input {
-            flex: 1;
-            min-width: 0;
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            background: #ffffff;
-            padding: 14px 16px;
-            font-size: 16px;
-            color: var(--text);
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-        }
-
-        .add-form input:focus {
-            border-color: rgba(255, 122, 89, 0.5);
-            box-shadow: 0 0 0 4px rgba(255, 122, 89, 0.12);
-            transform: translateY(-1px);
-        }
-
-        .button {
-            border: none;
-            border-radius: 16px;
-            padding: 13px 18px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.18s, box-shadow 0.18s, opacity 0.18s;
-        }
-
-        .button:hover {
-            transform: translateY(-1px);
-        }
-
-        .button-primary {
-            color: #ffffff;
-            background: linear-gradient(135deg, var(--accent), #ff9b54);
-            box-shadow: 0 12px 24px rgba(255, 122, 89, 0.24);
-        }
-
-        .button-clear {
-            color: #ffffff;
-            background: linear-gradient(135deg, #dc4f63, #f07d6f);
-            box-shadow: 0 12px 24px rgba(220, 79, 99, 0.22);
-        }
-
-        .button-done {
-            color: #ffffff;
-            background: linear-gradient(135deg, var(--done), #55b792);
-        }
-
-        .button-delete {
-            color: #ffffff;
-            background: linear-gradient(135deg, #cf4451, #ef6f67);
-        }
-
-        .button-disabled {
-            color: #ffffff;
-            background: #b3b8bf;
-            cursor: default;
-            box-shadow: none;
-        }
-
-        .button-disabled:hover {
-            transform: none;
-        }
-
-        .todo-list {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            display: grid;
-            gap: 14px;
-        }
-
-        .todo-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 18px;
-            border: 1px solid var(--line);
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.78);
-            box-shadow: 0 10px 24px rgba(33, 53, 71, 0.05);
-        }
-
-        .todo-main {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            min-width: 0;
-            flex: 1;
-        }
-
-        .todo-mark {
-            width: 14px;
-            height: 14px;
-            border-radius: 999px;
-            background: linear-gradient(135deg, var(--accent), #ffb46b);
-            flex-shrink: 0;
-        }
-
-        .todo-text {
-            margin: 0;
-            font-size: 17px;
-            line-height: 1.5;
-            word-break: break-word;
-        }
-
-        .todo-completed .todo-mark {
-            background: linear-gradient(135deg, var(--done), #7ad0af);
-        }
-
-        .todo-completed .todo-text {
-            color: #98a0aa;
-            text-decoration: line-through;
-        }
-
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-            gap: 10px;
-            flex-shrink: 0;
-        }
-
-        .actions form,
-        .toolbar form {
-            margin: 0;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 54px 20px;
-            border: 1px dashed rgba(33, 53, 71, 0.16);
-            border-radius: 24px;
-            background: rgba(255, 255, 255, 0.55);
-        }
-
-        .empty-state h2 {
-            margin: 0 0 10px;
-            font-size: 24px;
-        }
-
-        .empty-state p {
-            margin: 0;
-            color: var(--muted);
-            font-size: 15px;
-        }
-
-        @media (max-width: 700px) {
-            .hero-top,
-            .content {
-                padding: 22px 18px;
-            }
-
-            h1 {
-                font-size: 30px;
-            }
-
-            .stats {
-                grid-template-columns: 1fr;
-            }
-
-            .toolbar,
-            .add-form,
-            .todo-item,
-            .todo-main,
-            .actions {
-                display: flex;
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .todo-main {
-                gap: 10px;
-            }
-
-            .button {
-                width: 100%;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="shell">
-        <section class="hero">
-            <div class="hero-top">
-                <div class="badge">Todo App</div>
-                <h1>我的待办清单</h1>
-                <p class="subtitle">把今天要做的事收拢在一个清爽的小页面里，完成一项，轻松划掉一项。</p>
-
-                <div class="stats">
-                    <div class="stat-card">
-                        <p class="stat-label">全部任务</p>
-                        <p class="stat-value">{{ total_count }}</p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-label">已完成</p>
-                        <p class="stat-value">{{ completed_count }}</p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-label">未完成</p>
-                        <p class="stat-value">{{ pending_count }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="content">
-                <div class="toolbar">
-                    <form class="add-form" action="{{ url_for('add_todo_view') }}" method="post">
-                        <input type="text" name="content" placeholder="输入新的待办事项..." required>
-                        <button class="button button-primary" type="submit">添加</button>
-                    </form>
-
-                    {% if todos %}
-                    <form action="{{ url_for('clear_todos_view') }}" method="post">
-                        <button
-                            class="button button-clear"
-                            type="submit"
-                            onclick="return confirm('确定要清空全部待办事项吗？');"
-                        >
-                            全部清空
-                        </button>
-                    </form>
-                    {% endif %}
-                </div>
-
-                {% if todos %}
-                <ul class="todo-list">
-                    {% for todo in todos %}
-                    <li class="todo-item {% if todo.completed %}todo-completed{% endif %}">
-                        <div class="todo-main">
-                            <span class="todo-mark"></span>
-                            <p class="todo-text">{{ todo.content }}</p>
-                        </div>
-
-                        <div class="actions">
-                            {% if todo.completed %}
-                            <button class="button button-disabled" type="button" disabled>已完成</button>
-                            {% else %}
-                            <form action="{{ url_for('complete_todo_view', todo_id=todo.id) }}" method="post">
-                                <button class="button button-done" type="submit">✅ 标记完成</button>
-                            </form>
-                            {% endif %}
-
-                            <form action="{{ url_for('delete_todo_view', todo_id=todo.id) }}" method="post">
-                                <button
-                                    class="button button-delete"
-                                    type="submit"
-                                    onclick="return confirm('确定要删除这条任务吗？');"
-                                >
-                                    ❌ 删除任务
-                                </button>
-                            </form>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="empty-state">
-                    <h2>还没有待办任务</h2>
-                    <p>先添加一条小目标吧，今天从这里开始推进。</p>
-                </div>
-                {% endif %}
-            </div>
-        </section>
-    </div>
-</body>
-</html>
-"""
+def utc_now():
+    return datetime.now(timezone.utc).isoformat()
 
 
-def get_file_path():
-    file_path = os.environ.get("TODO_FILE_PATH", DEFAULT_FILE_PATH)
-    directory = os.path.dirname(file_path)
-    if directory:
-        os.makedirs(directory, exist_ok=True)
-    return file_path
+def is_valid_code(code):
+    return isinstance(code, str) and len(code) == 6 and code.isdigit()
 
 
-def load_todos():
-    file_path = get_file_path()
+def normalize_todo(item):
+    if not isinstance(item, dict):
+        return None
 
-    if not os.path.exists(file_path):
-        save_todos([])
-        return []
+    todo_id = item.get("id")
+    if not isinstance(todo_id, int):
+        return None
+
+    content = str(item.get("content", "")).strip()
+    if not content:
+        return None
+
+    return {
+        "id": todo_id,
+        "content": content,
+        "completed": bool(item.get("completed", False)),
+    }
+
+
+def normalize_space(code, space):
+    if not is_valid_code(code) or not isinstance(space, dict):
+        return None
+
+    owner_token = space.get("owner_token")
+    if not isinstance(owner_token, str) or not owner_token:
+        return None
+
+    todos = space.get("todos", [])
+    if not isinstance(todos, list):
+        todos = []
+
+    normalized_todos = []
+    max_id = 0
+    for item in todos:
+        todo = normalize_todo(item)
+        if todo is None:
+            continue
+        normalized_todos.append(todo)
+        if todo["id"] > max_id:
+            max_id = todo["id"]
+
+    next_id = space.get("next_id")
+    if not isinstance(next_id, int) or next_id <= max_id:
+        next_id = max_id + 1
+
+    return {
+        "code": code,
+        "owner_token": owner_token,
+        "shared": bool(space.get("shared", False)),
+        "next_id": next_id,
+        "todos": normalized_todos,
+        "created_at": space.get("created_at") or utc_now(),
+        "updated_at": space.get("updated_at") or utc_now(),
+    }
+
+
+def normalize_data(data):
+    if not isinstance(data, dict):
+        return {"spaces": {}}
+
+    raw_spaces = data.get("spaces")
+    if not isinstance(raw_spaces, dict):
+        if all(isinstance(key, str) for key in data.keys()):
+            raw_spaces = data
+        else:
+            raw_spaces = {}
+
+    spaces = {}
+    for code, space in raw_spaces.items():
+        normalized = normalize_space(code, space)
+        if normalized is not None:
+            spaces[code] = normalized
+
+    return {"spaces": spaces}
+
+
+def load_data_unlocked():
+    if not DATA_FILE.exists():
+        return {"spaces": {}}
 
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            todos = json.load(file)
-            if isinstance(todos, list):
-                return todos
+        with DATA_FILE.open("r", encoding="utf-8") as file:
+            raw_data = json.load(file)
     except (json.JSONDecodeError, OSError):
-        pass
+        return {"spaces": {}}
 
-    save_todos([])
-    return []
-
-
-def save_todos(todos):
-    file_path = get_file_path()
-    with open(file_path, "w", encoding="utf-8") as file:
-        json.dump(todos, file, ensure_ascii=False, indent=2)
+    return normalize_data(raw_data)
 
 
-def get_next_id(todos):
-    if not todos:
-        return 1
-    return max(todo["id"] for todo in todos) + 1
+def save_data_unlocked(data):
+    normalized = normalize_data(data)
+    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=str(DATA_FILE.parent),
+        delete=False,
+    ) as temp_file:
+        json.dump(normalized, temp_file, ensure_ascii=False, indent=2)
+        temp_file.flush()
+        os.fsync(temp_file.fileno())
+        temp_name = temp_file.name
+
+    os.replace(temp_name, DATA_FILE)
 
 
-def get_counts(todos):
-    total_count = len(todos)
-    completed_count = sum(1 for todo in todos if todo["completed"])
-    pending_count = total_count - completed_count
-    return total_count, completed_count, pending_count
+def generate_unique_code(spaces):
+    for _ in range(1000):
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        if code not in spaces:
+            return code
+    raise RuntimeError("无法生成新的 6 位准入码，请稍后重试。")
 
 
-def show_index():
-    todos = load_todos()
-    total_count, completed_count, pending_count = get_counts(todos)
-    return render_template_string(
-        HTML_PAGE,
-        todos=todos,
-        total_count=total_count,
-        completed_count=completed_count,
-        pending_count=pending_count,
-    )
+def get_json_data():
+    payload = request.get_json(silent=True)
+    if isinstance(payload, dict):
+        return payload
+    return {}
 
 
-def add_todo():
-    content = request.form.get("content", "").strip()
-    if content:
-        todos = load_todos()
-        todo = {
-            "id": get_next_id(todos),
-            "content": content,
-            "completed": False,
+def get_code_and_token():
+    payload = get_json_data()
+    code = str(payload.get("code", "")).strip()
+    owner_token = str(payload.get("owner_token", "")).strip()
+    return payload, code, owner_token
+
+
+def build_space_response(space, is_owner):
+    completed = sum(1 for todo in space["todos"] if todo["completed"])
+    return {
+        "code": space["code"],
+        "shared": bool(space["shared"]),
+        "is_owner": bool(is_owner),
+        "todos": space["todos"],
+        "stats": {
+            "total": len(space["todos"]),
+            "completed": completed,
+            "pending": len(space["todos"]) - completed,
+        },
+    }
+
+
+def unauthorized_private_response():
+    return jsonify(
+        {
+            "message": "该空间尚未开启共享，只有创建该空间的设备可以访问。",
         }
-        todos.append(todo)
-        save_todos(todos)
-    return redirect(url_for("index"))
+    ), 403
 
 
-def complete_todo(todo_id):
-    todos = load_todos()
-    for todo in todos:
-        if todo["id"] == todo_id:
-            todo["completed"] = True
-            break
-    save_todos(todos)
-    return redirect(url_for("index"))
+@app.get("/")
+def show_index():
+    return render_template("index.html")
 
 
-def delete_todo(todo_id):
-    todos = load_todos()
-    todos = [todo for todo in todos if todo["id"] != todo_id]
-    save_todos(todos)
-    return redirect(url_for("index"))
-
-
-def clear_todos():
-    save_todos([])
-    return redirect(url_for("index"))
-
-
+@app.get("/health")
 def health_check():
     return "ok"
 
 
-app.add_url_rule("/", "index", show_index, methods=["GET"])
-app.add_url_rule("/add", "add_todo_view", add_todo, methods=["POST"])
-app.add_url_rule("/complete/<int:todo_id>", "complete_todo_view", complete_todo, methods=["POST"])
-app.add_url_rule("/delete/<int:todo_id>", "delete_todo_view", delete_todo, methods=["POST"])
-app.add_url_rule("/clear", "clear_todos_view", clear_todos, methods=["POST"])
-app.add_url_rule("/health", "health_check", health_check, methods=["GET"])
+@app.post("/api/spaces")
+def create_space():
+    with DATA_LOCK:
+        data = load_data_unlocked()
+        code = generate_unique_code(data["spaces"])
+        owner_token = secrets.token_urlsafe(24)
+        timestamp = utc_now()
+
+        space = {
+            "code": code,
+            "owner_token": owner_token,
+            "shared": False,
+            "next_id": 1,
+            "todos": [],
+            "created_at": timestamp,
+            "updated_at": timestamp,
+        }
+        data["spaces"][code] = space
+        save_data_unlocked(data)
+
+    return jsonify(
+        {
+            "message": "已生成新的独立空间。",
+            "owner_token": owner_token,
+            "space": build_space_response(space, True),
+        }
+    )
+
+
+@app.post("/api/access")
+def access_space():
+    _, code, owner_token = get_code_and_token()
+    if not is_valid_code(code):
+        return jsonify({"message": "请输入正确的 6 位数字准入码。"}), 400
+
+    with DATA_LOCK:
+        data = load_data_unlocked()
+        space = data["spaces"].get(code)
+        if space is None:
+            return jsonify({"message": "未找到对应的清单，请检查准入码是否正确。"}), 404
+
+        is_owner = owner_token == space["owner_token"]
+        if not (space["shared"] or is_owner):
+            return unauthorized_private_response()
+
+        return jsonify(
+            {
+                "message": "已进入清单。",
+                "space": build_space_response(space, is_owner),
+            }
+        )
+
+
+@app.post("/api/share")
+def toggle_share():
+    payload, code, owner_token = get_code_and_token()
+    shared = bool(payload.get("shared", False))
+
+    if not is_valid_code(code):
+        return jsonify({"message": "请输入正确的 6 位数字准入码。"}), 400
+
+    with DATA_LOCK:
+        data = load_data_unlocked()
+        space = data["spaces"].get(code)
+        if space is None:
+            return jsonify({"message": "未找到对应的清单。"}), 404
+
+        is_owner = owner_token == space["owner_token"]
+        if not is_owner:
+            return jsonify({"message": "只有创建该空间的设备可以切换共享状态。"}), 403
+
+        space["shared"] = shared
+        space["updated_at"] = utc_now()
+        save_data_unlocked(data)
+
+        message = "已开启共享模式。" if shared else "已关闭共享模式。"
+        return jsonify(
+            {
+                "message": message,
+                "space": build_space_response(space, True),
+            }
+        )
+
+
+@app.post("/api/todos")
+def add_todo():
+    payload, code, owner_token = get_code_and_token()
+    content = str(payload.get("content", "")).strip()
+
+    if not is_valid_code(code):
+        return jsonify({"message": "请输入正确的 6 位数字准入码。"}), 400
+    if not content:
+        return jsonify({"message": "待办事项内容不能为空。"}), 400
+
+    with DATA_LOCK:
+        data = load_data_unlocked()
+        space = data["spaces"].get(code)
+        if space is None:
+            return jsonify({"message": "未找到对应的清单。"}), 404
+
+        is_owner = owner_token == space["owner_token"]
+        if not (space["shared"] or is_owner):
+            return unauthorized_private_response()
+
+        todo = {
+            "id": space["next_id"],
+            "content": content,
+            "completed": False,
+        }
+        space["next_id"] += 1
+        space["todos"].append(todo)
+        space["updated_at"] = utc_now()
+        save_data_unlocked(data)
+
+        return jsonify(
+            {
+                "message": "待办事项已添加。",
+                "space": build_space_response(space, is_owner),
+            }
+        )
+
+
+@app.post("/api/todos/<int:todo_id>/complete")
+def complete_todo(todo_id):
+    _, code, owner_token = get_code_and_token()
+
+    if not is_valid_code(code):
+        return jsonify({"message": "请输入正确的 6 位数字准入码。"}), 400
+
+    with DATA_LOCK:
+        data = load_data_unlocked()
+        space = data["spaces"].get(code)
+        if space is None:
+            return jsonify({"message": "未找到对应的清单。"}), 404
+
+        is_owner = owner_token == space["owner_token"]
+        if not (space["shared"] or is_owner):
+            return unauthorized_private_response()
+
+        for todo in space["todos"]:
+            if todo["id"] == todo_id:
+                todo["completed"] = True
+                space["updated_at"] = utc_now()
+                save_data_unlocked(data)
+                return jsonify(
+                    {
+                        "message": "任务已标记为完成。",
+                        "space": build_space_response(space, is_owner),
+                    }
+                )
+
+        return jsonify({"message": "未找到对应的待办事项。"}), 404
+
+
+@app.delete("/api/todos/<int:todo_id>")
+def delete_todo(todo_id):
+    _, code, owner_token = get_code_and_token()
+
+    if not is_valid_code(code):
+        return jsonify({"message": "请输入正确的 6 位数字准入码。"}), 400
+
+    with DATA_LOCK:
+        data = load_data_unlocked()
+        space = data["spaces"].get(code)
+        if space is None:
+            return jsonify({"message": "未找到对应的清单。"}), 404
+
+        is_owner = owner_token == space["owner_token"]
+        if not (space["shared"] or is_owner):
+            return unauthorized_private_response()
+
+        original_length = len(space["todos"])
+        space["todos"] = [todo for todo in space["todos"] if todo["id"] != todo_id]
+        if len(space["todos"]) == original_length:
+            return jsonify({"message": "未找到对应的待办事项。"}), 404
+
+        space["updated_at"] = utc_now()
+        save_data_unlocked(data)
+
+        return jsonify(
+            {
+                "message": "任务已删除。",
+                "space": build_space_response(space, is_owner),
+            }
+        )
+
+
+@app.delete("/api/todos")
+def clear_todos():
+    _, code, owner_token = get_code_and_token()
+
+    if not is_valid_code(code):
+        return jsonify({"message": "请输入正确的 6 位数字准入码。"}), 400
+
+    with DATA_LOCK:
+        data = load_data_unlocked()
+        space = data["spaces"].get(code)
+        if space is None:
+            return jsonify({"message": "未找到对应的清单。"}), 404
+
+        is_owner = owner_token == space["owner_token"]
+        if not (space["shared"] or is_owner):
+            return unauthorized_private_response()
+
+        space["todos"] = []
+        space["updated_at"] = utc_now()
+        save_data_unlocked(data)
+
+        return jsonify(
+            {
+                "message": "已清空全部待办事项。",
+                "space": build_space_response(space, is_owner),
+            }
+        )
 
 
 if __name__ == "__main__":

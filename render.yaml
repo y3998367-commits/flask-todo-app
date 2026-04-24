@@ -8,9 +8,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-      - key: TODO_FILE_PATH
-        value: /var/data/todos.json
-    disk:
-      name: todo-data
-      mountPath: /var/data
-      sizeGB: 1

@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>我的待办清单</title>
+    <style>
+        :root {
+            --bg-top: #f9f1e8;
+            --bg-bottom: #eef6f1;
+            --card: rgba(255, 255, 255, 0.92);
+            --text: #213547;
+            --muted: #6b7a89;
+            --line: rgba(33, 53, 71, 0.08);
+            --accent: #ff7a59;
+            --accent-dark: #e56747;
+            --done: #3a9d7a;
+            --danger: #e14d5a;
+            --info: #4f7cf0;
+            --shadow: 0 20px 50px rgba(33, 53, 71, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(255, 122, 89, 0.18), transparent 30%),
+                radial-gradient(circle at top right, rgba(58, 157, 122, 0.16), transparent 24%),
+                linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+            padding: 32px 16px;
+        }
+
+        .shell {
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .hero-top {
+            padding: 32px 32px 24px;
+            background:
+                linear-gradient(135deg, rgba(255, 122, 89, 0.18), rgba(58, 157, 122, 0.12)),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.82));
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.75);
+            color: var(--accent-dark);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        h1 {
+            margin: 18px 0 10px;
+            font-size: 38px;
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 24px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 20px;
+            padding: 18px;
+        }
+
+        .stat-label {
+            margin: 0 0 8px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .stat-value {
+            margin: 0;
+            font-size: 30px;
+            font-weight: 700;
+        }
+
+        .content {
+            padding: 28px 32px 32px;
+        }
+
+        .notice {
+            margin: 0 0 22px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .notice-info {
+            background: rgba(58, 157, 122, 0.1);
+            color: #2f6f59;
+        }
+
+        .notice-success {
+            background: rgba(58, 157, 122, 0.12);
+            color: #2f6f59;
+        }
+
+        .notice-error {
+            background: rgba(225, 77, 90, 0.12);
+            color: #9b3040;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .access-panel {
+            margin-bottom: 24px;
+            padding: 20px;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.76);
+            box-shadow: 0 12px 24px rgba(33, 53, 71, 0.05);
+        }
+
+        .access-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .access-form {
+            display: flex;
+            gap: 12px;
+        }
+
+        .input {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: #ffffff;
+            padding: 14px 16px;
+            font-size: 16px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+        }
+
+        .input:focus {
+            border-color: rgba(255, 122, 89, 0.5);
+            box-shadow: 0 0 0 4px rgba(255, 122, 89, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .button {
+            border: none;
+            border-radius: 16px;
+            padding: 13px 18px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.18s, box-shadow 0.18s, opacity 0.18s;
+            white-space: nowrap;
+        }
+
+        .button:hover {
+            transform: translateY(-1px);
+        }
+
+        .button-primary {
+            color: #ffffff;
+            background: linear-gradient(135deg, var(--accent), #ff9b54);
+            box-shadow: 0 12px 24px rgba(255, 122, 89, 0.24);
+        }
+
+        .button-secondary {
+            color: #ffffff;
+            background: linear-gradient(135deg, var(--info), #73a1ff);
+            box-shadow: 0 12px 24px rgba(79, 124, 240, 0.2);
+        }
+
+        .button-share {
+            color: #ffffff;
+            background: linear-gradient(135deg, #6c63ff, #8b83ff);
+            box-shadow: 0 12px 24px rgba(108, 99, 255, 0.22);
+        }
+
+        .button-clear {
+            color: #ffffff;
+            background: linear-gradient(135deg, #dc4f63, #f07d6f);
+            box-shadow: 0 12px 24px rgba(220, 79, 99, 0.22);
+        }
+
+        .button-done {
+            color: #ffffff;
+            background: linear-gradient(135deg, var(--done), #55b792);
+        }
+
+        .button-delete {
+            color: #ffffff;
+            background: linear-gradient(135deg, #cf4451, #ef6f67);
+        }
+
+        .button-disabled,
+        .button:disabled {
+            color: #ffffff;
+            background: #b3b8bf;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        .button-disabled:hover,
+        .button:disabled:hover {
+            transform: none;
+        }
+
+        .room-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+            align-items: center;
+        }
+
+        .room-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(33, 53, 71, 0.06);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .room-tip {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .add-form {
+            display: flex;
+            flex: 1;
+            min-width: 280px;
+            gap: 12px;
+        }
+
+        .todo-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 14px;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.78);
+            box-shadow: 0 10px 24px rgba(33, 53, 71, 0.05);
+        }
+
+        .todo-main {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .todo-mark {
+            width: 14px;
+            height: 14px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--accent), #ffb46b);
+            flex-shrink: 0;
+        }
+
+        .todo-text {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .todo-completed .todo-mark {
+            background: linear-gradient(135deg, var(--done), #7ad0af);
+        }
+
+        .todo-completed .todo-text {
+            color: #98a0aa;
+            text-decoration: line-through;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 54px 20px;
+            border: 1px dashed rgba(33, 53, 71, 0.16);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.55);
+        }
+
+        .empty-state h2 {
+            margin: 0 0 10px;
+            font-size: 24px;
+        }
+
+        .empty-state p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 700px) {
+            .hero-top,
+            .content {
+                padding: 22px 18px;
+            }
+
+            h1 {
+                font-size: 30px;
+            }
+
+            .stats,
+            .access-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar,
+            .add-form,
+            .access-form,
+            .todo-item,
+            .todo-main,
+            .actions {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .todo-main {
+                gap: 10px;
+            }
+
+            .button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <div class="hero-top">
+                <div class="badge">Todo App</div>
+                <h1>我的待办清单</h1>
+                <p class="subtitle">每个 6 位准入码对应一份独立待办清单。默认私有，只有创建者当前设备可访问；开启共享后，知道该准入码的人都可以查看并编辑。</p>
+
+                <div class="stats">
+                    <div class="stat-card">
+                        <p class="stat-label">全部任务</p>
+                        <p class="stat-value" id="total-count">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <p class="stat-label">已完成</p>
+                        <p class="stat-value" id="completed-count">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <p class="stat-label">未完成</p>
+                        <p class="stat-value" id="pending-count">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <p class="notice notice-info" id="flash-message">
+                    进入网站后，请先输入 6 位准入码；如果你还没有独立空间，可以直接点击“生成新独立空间”。
+                </p>
+
+                <div class="access-panel">
+                    <div class="access-grid">
+                        <form class="access-form" id="access-form">
+                            <input
+                                class="input"
+                                id="code-input"
+                                type="text"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                maxlength="6"
+                                placeholder="输入 6 位准入码"
+                                required
+                            >
+                            <button class="button button-primary" type="submit">进入清单</button>
+                        </form>
+
+                        <button class="button button-secondary" id="create-space-button" type="button">生成新独立空间</button>
+                        <button class="button button-share" id="share-toggle-button" type="button" disabled>开启共享</button>
+                    </div>
+
+                    <div class="room-bar">
+                        <span class="room-pill" id="room-code-pill">当前空间：未进入</span>
+                        <span class="room-pill" id="room-mode-pill">模式：默认私有</span>
+                        <button class="button button-secondary" id="copy-code-button" type="button">复制准入码</button>
+                        <button class="button button-clear" id="leave-space-button" type="button">退出当前空间</button>
+                        <span class="room-tip" id="room-tip">不同准入码之间数据完全隔离。</span>
+                    </div>
+                </div>
+
+                <div id="todo-section" class="hidden">
+                    <p class="notice notice-info" id="mode-notice">
+                        当前空间已载入。
+                    </p>
+
+                    <div class="toolbar">
+                        <form class="add-form" id="add-form">
+                            <input class="input" id="todo-input" type="text" name="content" placeholder="输入新的待办事项..." required>
+                            <button class="button button-primary" type="submit">添加</button>
+                        </form>
+
+                        <button
+                            class="button button-clear"
+                            id="clear-button"
+                            type="button"
+                        >
+                            全部清空
+                        </button>
+                    </div>
+
+                    <ul class="todo-list" id="todo-list"></ul>
+
+                    <div class="empty-state" id="empty-state">
+                        <h2>还没有待办任务</h2>
+                        <p>先添加一条小目标吧，今天从这里开始推进。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const OWNER_TOKENS_KEY = "todo_owner_tokens_v1";
+        const LAST_CODE_KEY = "todo_last_code_v1";
+
+        const accessForm = document.getElementById("access-form");
+        const addForm = document.getElementById("add-form");
+        const codeInput = document.getElementById("code-input");
+        const todoInput = document.getElementById("todo-input");
+        const createSpaceButton = document.getElementById("create-space-button");
+        const shareToggleButton = document.getElementById("share-toggle-button");
+        const copyCodeButton = document.getElementById("copy-code-button");
+        const leaveSpaceButton = document.getElementById("leave-space-button");
+        const clearButton = document.getElementById("clear-button");
+        const todoList = document.getElementById("todo-list");
+        const emptyState = document.getElementById("empty-state");
+        const todoSection = document.getElementById("todo-section");
+        const flashMessage = document.getElementById("flash-message");
+        const modeNotice = document.getElementById("mode-notice");
+        const roomCodePill = document.getElementById("room-code-pill");
+        const roomModePill = document.getElementById("room-mode-pill");
+        const roomTip = document.getElementById("room-tip");
+        const totalCount = document.getElementById("total-count");
+        const completedCount = document.getElementById("completed-count");
+        const pendingCount = document.getElementById("pending-count");
+
+        let currentSpace = null;
+
+        function loadOwnerTokens() {
+            try {
+                const raw = localStorage.getItem(OWNER_TOKENS_KEY);
+                const parsed = raw ? JSON.parse(raw) : {};
+                return parsed && typeof parsed === "object" ? parsed : {};
+            } catch (error) {
+                return {};
+            }
+        }
+
+        function saveOwnerTokens(tokens) {
+            localStorage.setItem(OWNER_TOKENS_KEY, JSON.stringify(tokens));
+        }
+
+        function getOwnerToken(code) {
+            const tokens = loadOwnerTokens();
+            const token = tokens[code];
+            return typeof token === "string" ? token : "";
+        }
+
+        function setOwnerToken(code, ownerToken) {
+            const tokens = loadOwnerTokens();
+            tokens[code] = ownerToken;
+            saveOwnerTokens(tokens);
+        }
+
+        function setLastCode(code) {
+            localStorage.setItem(LAST_CODE_KEY, code);
+        }
+
+        function clearLastCode() {
+            localStorage.removeItem(LAST_CODE_KEY);
+        }
+
+        function getLastCode() {
+            return localStorage.getItem(LAST_CODE_KEY) || "";
+        }
+
+        function setFlash(message, type) {
+            flashMessage.textContent = message;
+            flashMessage.className = "notice";
+            flashMessage.classList.add(type === "error" ? "notice-error" : type === "success" ? "notice-success" : "notice-info");
+        }
+
+        function sanitizeCodeInput(value) {
+            return value.replace(/\D/g, "").slice(0, 6);
+        }
+
+        async function api(url, options = {}) {
+            const response = await fetch(url, {
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(options.headers || {})
+                },
+                ...options
+            });
+
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (error) {
+                data = {};
+            }
+
+            if (!response.ok) {
+                throw new Error(data.message || "请求失败，请稍后重试。");
+            }
+
+            return data;
+        }
+
+        function updateStats(space) {
+            const stats = space ? space.stats : { total: 0, completed: 0, pending: 0 };
+            totalCount.textContent = String(stats.total);
+            completedCount.textContent = String(stats.completed);
+            pendingCount.textContent = String(stats.pending);
+        }
+
+        function renderCurrentSpace() {
+            updateStats(currentSpace);
+
+            if (!currentSpace) {
+                todoSection.classList.add("hidden");
+                roomCodePill.textContent = "当前空间：未进入";
+                roomModePill.textContent = "模式：默认私有";
+                roomTip.textContent = "不同准入码之间数据完全隔离。";
+                shareToggleButton.disabled = true;
+                shareToggleButton.textContent = "开启共享";
+                copyCodeButton.disabled = true;
+                leaveSpaceButton.disabled = true;
+                return;
+            }
+
+            todoSection.classList.remove("hidden");
+            roomCodePill.textContent = `当前空间：${currentSpace.code}`;
+            roomModePill.textContent = `模式：${currentSpace.shared ? "共享" : "私有"}`;
+            copyCodeButton.disabled = false;
+            leaveSpaceButton.disabled = false;
+
+            if (currentSpace.shared) {
+                roomTip.textContent = currentSpace.is_owner
+                    ? "共享已开启，知道准入码的人都可以查看并编辑这份清单。"
+                    : "你正在访问共享空间，可以查看并编辑；仅创建者设备可关闭共享。";
+            } else {
+                roomTip.textContent = currentSpace.is_owner
+                    ? "当前为私有模式，只有创建这个空间的当前设备可以访问。"
+                    : "当前空间为私有模式。";
+            }
+
+            modeNotice.textContent = currentSpace.shared
+                ? "当前空间处于共享模式：输入同一准入码的人会共享同一份待办清单。"
+                : "当前空间处于私有模式：其他设备即使知道准入码，也无法进入该清单。";
+
+            shareToggleButton.textContent = currentSpace.shared ? "关闭共享" : "开启共享";
+            shareToggleButton.disabled = !currentSpace.is_owner;
+            shareToggleButton.title = currentSpace.is_owner ? "" : "只有创建该空间的设备可以切换共享";
+
+            const todos = currentSpace.todos || [];
+            todoList.innerHTML = "";
+            clearButton.style.display = todos.length > 0 ? "inline-block" : "none";
+            emptyState.style.display = todos.length > 0 ? "none" : "block";
+
+            for (let i = 0; i < todos.length; i += 1) {
+                const todo = todos[i];
+                const item = document.createElement("li");
+                item.className = todo.completed ? "todo-item todo-completed" : "todo-item";
+
+                const main = document.createElement("div");
+                main.className = "todo-main";
+
+                const mark = document.createElement("span");
+                mark.className = "todo-mark";
+
+                const text = document.createElement("p");
+                text.className = "todo-text";
+                text.textContent = todo.content;
+
+                main.appendChild(mark);
+                main.appendChild(text);
+
+                const actions = document.createElement("div");
+                actions.className = "actions";
+
+                if (todo.completed) {
+                    const doneButton = document.createElement("button");
+                    doneButton.className = "button button-disabled";
+                    doneButton.type = "button";
+                    doneButton.disabled = true;
+                    doneButton.textContent = "已完成";
+                    actions.appendChild(doneButton);
+                } else {
+                    const completeButton = document.createElement("button");
+                    completeButton.className = "button button-done";
+                    completeButton.type = "button";
+                    completeButton.textContent = "✓ 标记完成";
+                    completeButton.onclick = function () {
+                        completeTodo(todo.id);
+                    };
+                    actions.appendChild(completeButton);
+                }
+
+                const deleteButton = document.createElement("button");
+                deleteButton.className = "button button-delete";
+                deleteButton.type = "button";
+                deleteButton.textContent = "✕ 删除任务";
+                deleteButton.onclick = function () {
+                    deleteTodo(todo.id);
+                };
+                actions.appendChild(deleteButton);
+
+                item.appendChild(main);
+                item.appendChild(actions);
+                todoList.appendChild(item);
+            }
+        }
+
+        async function enterSpace(code, successMessage) {
+            const cleanCode = sanitizeCodeInput(code);
+            if (cleanCode.length !== 6) {
+                setFlash("请输入正确的 6 位数字准入码。", "error");
+                return;
+            }
+
+            try {
+                const data = await api("/api/access", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        code: cleanCode,
+                        owner_token: getOwnerToken(cleanCode)
+                    })
+                });
+
+                currentSpace = data.space;
+                codeInput.value = cleanCode;
+                setLastCode(cleanCode);
+                renderCurrentSpace();
+                setFlash(successMessage || data.message || "已进入清单。", "success");
+            } catch (error) {
+                currentSpace = null;
+                renderCurrentSpace();
+                setFlash(error.message, "error");
+            }
+        }
+
+        async function createSpace() {
+            try {
+                const data = await api("/api/spaces", {
+                    method: "POST",
+                    body: JSON.stringify({})
+                });
+
+                currentSpace = data.space;
+                setOwnerToken(data.space.code, data.owner_token);
+                setLastCode(data.space.code);
+                codeInput.value = data.space.code;
+                renderCurrentSpace();
+                setFlash(`已生成新的独立空间，准入码：${data.space.code}`, "success");
+            } catch (error) {
+                setFlash(error.message, "error");
+            }
+        }
+
+        async function copyCurrentCode() {
+            if (!currentSpace) {
+                setFlash("请先进入一个清单后再复制准入码。", "error");
+                return;
+            }
+
+            const code = currentSpace.code;
+
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(code);
+                } else {
+                    const tempInput = document.createElement("input");
+                    tempInput.value = code;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(tempInput);
+                }
+                setFlash(`准入码 ${code} 已复制。`, "success");
+            } catch (error) {
+                setFlash("复制失败，请手动复制当前准入码。", "error");
+            }
+        }
+
+        function leaveCurrentSpace() {
+            if (!currentSpace) {
+                setFlash("当前还没有进入任何空间。", "error");
+                return;
+            }
+
+            currentSpace = null;
+            codeInput.value = "";
+            clearLastCode();
+            renderCurrentSpace();
+            setFlash("已退出当前空间。你可以重新输入准入码进入其他清单。", "success");
+        }
+
+        function buildSpacePayload(extra = {}) {
+            if (!currentSpace) {
+                throw new Error("请先输入准入码并进入清单。");
+            }
+
+            return {
+                code: currentSpace.code,
+                owner_token: getOwnerToken(currentSpace.code),
+                ...extra
+            };
+        }
+
+        async function addTodo(content) {
+            const data = await api("/api/todos", {
+                method: "POST",
+                body: JSON.stringify(buildSpacePayload({ content }))
+            });
+
+            currentSpace = data.space;
+            renderCurrentSpace();
+            setFlash(data.message, "success");
+        }
+
+        async function completeTodo(todoId) {
+            try {
+                const data = await api(`/api/todos/${todoId}/complete`, {
+                    method: "POST",
+                    body: JSON.stringify(buildSpacePayload())
+                });
+
+                currentSpace = data.space;
+                renderCurrentSpace();
+                setFlash(data.message, "success");
+            } catch (error) {
+                setFlash(error.message, "error");
+            }
+        }
+
+        async function deleteTodo(todoId) {
+            const shouldDelete = window.confirm("确定要删除这条任务吗？");
+            if (!shouldDelete) {
+                return;
+            }
+
+            try {
+                const data = await api(`/api/todos/${todoId}`, {
+                    method: "DELETE",
+                    body: JSON.stringify(buildSpacePayload())
+                });
+
+                currentSpace = data.space;
+                renderCurrentSpace();
+                setFlash(data.message, "success");
+            } catch (error) {
+                setFlash(error.message, "error");
+            }
+        }
+
+        async function clearTodos() {
+            const shouldClear = window.confirm("确定要清空全部待办事项吗？");
+            if (!shouldClear) {
+                return;
+            }
+
+            try {
+                const data = await api("/api/todos", {
+                    method: "DELETE",
+                    body: JSON.stringify(buildSpacePayload())
+                });
+
+                currentSpace = data.space;
+                renderCurrentSpace();
+                setFlash(data.message, "success");
+            } catch (error) {
+                setFlash(error.message, "error");
+            }
+        }
+
+        async function toggleShare() {
+            if (!currentSpace) {
+                setFlash("请先进入一个清单。", "error");
+                return;
+            }
+
+            try {
+                const data = await api("/api/share", {
+                    method: "POST",
+                    body: JSON.stringify(buildSpacePayload({ shared: !currentSpace.shared }))
+                });
+
+                currentSpace = data.space;
+                renderCurrentSpace();
+                setFlash(data.message, "success");
+            } catch (error) {
+                setFlash(error.message, "error");
+            }
+        }
+
+        codeInput.addEventListener("input", function () {
+            codeInput.value = sanitizeCodeInput(codeInput.value);
+        });
+
+        accessForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            enterSpace(codeInput.value);
+        });
+
+        createSpaceButton.addEventListener("click", createSpace);
+        shareToggleButton.addEventListener("click", toggleShare);
+        copyCodeButton.addEventListener("click", copyCurrentCode);
+        leaveSpaceButton.addEventListener("click", leaveCurrentSpace);
+        clearButton.addEventListener("click", clearTodos);
+
+        addForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const content = todoInput.value.trim();
+            if (!content) {
+                setFlash("待办事项内容不能为空。", "error");
+                return;
+            }
+
+            try {
+                await addTodo(content);
+                todoInput.value = "";
+                todoInput.focus();
+            } catch (error) {
+                setFlash(error.message, "error");
+            }
+        });
+
+        codeInput.value = sanitizeCodeInput(getLastCode());
+        renderCurrentSpace();
+    </script>
+</body>
+</html>
